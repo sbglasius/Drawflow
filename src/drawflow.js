@@ -8,6 +8,7 @@ export default class Drawflow {
     this.node_selected = null;
     this.drag = false;
     this.reroute = false;
+    this.one_connection_per_output = false; // Exclusive one output connection
     this.reroute_fix_curvature = false;
     this.curvature = 0.5;
     this.reroute_curvature_start_end = 0.5;
@@ -493,6 +494,12 @@ export default class Drawflow {
             var id_input = input_id.slice(5);
             var id_output = output_id.slice(5);
 
+            if(this.one_connection_per_output && this.drawflow.drawflow[this.module].data[id_output].outputs[output_class].connections.length > 0) {
+              this.dispatch('connectionCancel', true);
+              this.connection_ele.remove();
+              return
+            }
+            
             this.drawflow.drawflow[this.module].data[id_output].outputs[output_class].connections.push({
               "node": id_input,
               "output": input_class
@@ -549,7 +556,7 @@ export default class Drawflow {
     if (this.precanvas.getElementsByClassName("drawflow-delete").length) {
       this.precanvas.getElementsByClassName("drawflow-delete")[0].remove()
     }
-    
+
     if (this.node_selected || this.connection_selected) {
       var deletebox = document.createElement('div');
       deletebox.classList.add("drawflow-delete");
@@ -574,7 +581,7 @@ export default class Drawflow {
     if (this.precanvas.getElementsByClassName("drawflow-delete").length) {
       this.precanvas.getElementsByClassName("drawflow-delete")[0].remove()
     }
-    
+
   }
 
   key(e) {
@@ -723,6 +730,7 @@ export default class Drawflow {
   }
 
   addConnection(id_output, id_input, output_class, input_class) {
+    console.log("Add Connection", id_output, id_input, output_class, input_class)
     var nodeOneModule = this.getModuleFromNodeId(id_output);
     var nodeTwoModule = this.getModuleFromNodeId(id_input);
     if (nodeOneModule === nodeTwoModule) {
@@ -735,8 +743,22 @@ export default class Drawflow {
           exist = true;
         }
       }
+
+      // Check if output is populated
+      var prevent_new_connection = false;
+      if (this.one_connection_per_output === true) {
+        console.log("Count output nodes")
+        for (var checkOutput in dataNode.outputs[output_class].connections) {
+          var connectionSearch = dataNode.outputs[output_class].connections[checkOutput]
+          if (connectionSearch) {
+            prevent_new_connection = true;
+          }
+        }
+        console.log("OutputExists ", dataNode.outputs[output_class], prevent_new_connection)
+      }
+
       // Check connection exist
-      if (exist === false) {
+      if (exist === false && prevent_new_connection === false) {
         //Create Connection
         this.drawflow.drawflow[nodeOneModule].data[id_output].outputs[output_class].connections.push({
           "node": id_input.toString(),
@@ -1518,7 +1540,7 @@ export default class Drawflow {
             ele.appendChild(point);
           });
         }
-        
+
       });
     });
   }
@@ -1590,7 +1612,7 @@ export default class Drawflow {
     }
   }
 
-  addNodeInput(id) {
+  addNodeInput(id, extraClass) {
     var moduleName = this.getModuleFromNodeId(id)
     const infoNode = this.getNodeFromId(id)
     const numInputs = Object.keys(infoNode.inputs).length;
@@ -1599,7 +1621,10 @@ export default class Drawflow {
       const input = document.createElement('div');
       input.classList.add("input");
       input.classList.add("input_" + (numInputs + 1));
-      const parent = this.container.querySelector('#node-' + id + ' .inputs');
+      if (extraClass) {
+        input.classList.add(extraClass);
+        input.classList.add(extraClass + "_" + (numInputs + 1));
+      }   const parent = this.container.querySelector('#node-' + id + ' .inputs');
       parent.appendChild(input);
       this.updateConnectionNodes('node-' + id);
 
@@ -1607,7 +1632,7 @@ export default class Drawflow {
     this.drawflow.drawflow[moduleName].data[id].inputs["input_" + (numInputs + 1)] = {"connections": []};
   }
 
-  addNodeOutput(id) {
+  addNodeOutput(id, extraClass) {
     var moduleName = this.getModuleFromNodeId(id)
     const infoNode = this.getNodeFromId(id)
     const numOutputs = Object.keys(infoNode.outputs).length;
@@ -1616,6 +1641,10 @@ export default class Drawflow {
       const output = document.createElement('div');
       output.classList.add("output");
       output.classList.add("output_" + (numOutputs + 1));
+      if(extraClass) {
+        output.classList.add(extraClass);
+        output.classList.add(extraClass + "_" + (numOutputs + 1));
+      }
       const parent = this.container.querySelector('#node-' + id + ' .outputs');
       parent.appendChild(output);
       this.updateConnectionNodes('node-' + id);
